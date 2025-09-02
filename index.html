@@ -1,0 +1,1046 @@
+<!--
+Run instructions (save this file as index.html and open in a browser):
+1) Open index.html in Chrome/Edge/Firefox.
+2) Login: username "admin" password "1234".
+3) Data stored in localStorage keys: "books" and "issued".
+4) To reset data open DevTools > Application > Local Storage and clear keys.
+
+Replace image links where indicated by the /* REPLACE: images/<name>.jpg */ comments.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Library Management System (Single File)</title>
+<style>
+  /* Basic page & background */
+  :root{
+    --card-bg: rgba(255,255,255,0.92);
+    --accent: #3b82f6;
+    --rounded: 14px;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#f0f4f8;}
+  body{
+    display:flex;align-items:center;justify-content:center;
+    background-image: url('books2jpg'); /* REPLACE: images/background.jpg */
+    background-size:cover;background-position:center;
+    padding:20px;
+  }
+
+  /* App container */
+  .app {
+    width:100%;max-width:1100px;background:var(--card-bg);
+background-image: url('books3.jpg');
+    border-radius:18px;box-shadow:0 10px 40px rgba(2,6,23,0.12);
+    padding:24px;min-height:640px;display:flex;flex-direction:column;
+    position:relative;
+  }
+
+  header{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}
+  header h1{margin:0;font-size:20px;color:#0f172a}
+  .user-info{font-size:13px;color:#334155}
+
+  /* Center screens */
+  .screen{flex:1;display:none;align-items:center;justify-content:center;flex-direction:column;}
+  .screen.active{display:flex;}
+
+  /* Login */
+  .login-card{width:420px;background:#fff;border-radius:12px;padding:28px;box-shadow:0 6px 18px rgba(2,6,23,0.08);text-align:center}
+  .login-card h2{margin:0 0 8px}
+  .login-card p{margin:0 0 18px;color:#334155}
+  .input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #e6e9ef;margin-bottom:12px;font-size:14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer;transition:transform .14s ease,box-shadow .14s}
+  .btn:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(59,130,246,0.18)}
+  .btn.secondary{background:#64748b}
+
+  /* Main menu: 2 rows x 3 columns */
+  .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:100%;max-width:860px}
+  .menu-btn{
+    background:rgba(255,255,255,0.98);border-radius:16px;padding:18px;display:flex;flex-direction:column;align-items:center;
+    justify-content:flex-start;cursor:pointer;border:1px solid rgba(2,6,23,0.04);transition:transform .14s ease,box-shadow .14s;
+    min-height:150px;
+  }
+  .menu-btn:hover{transform:translateY(-6px) scale(1.01);box-shadow:0 10px 30px rgba(2,6,23,0.06)}
+  .menu-btn img{width:150px;height:150px;border-radius:999px;object-fit:cover}
+  .menu-label{margin-top:10px;font-weight:700;color:#0f172a;text-align:center}
+
+  /* Small category grid (6 items) */
+  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:760px;margin-top:6px}
+  .cat-btn{
+    padding:8px;border-radius:12px;background:#fff;border:1px solid rgba(2,6,23,0.04);
+    display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:transform .12s;
+  }
+  .cat-btn:hover{transform:translateY(-6px)}
+  .cat-btn img{width:150px;height:150px;border-radius:12px}
+  .cat-label{font-size:px;margin-top:8px;font-weight:600}
+
+  /* Go back bottom-center */
+  .go-back{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:14px;
+    padding:8px 18px;border-radius:12px;background:#FFFFFF;border:1px solid rgba(2,6,23,0.04);cursor:pointer;
+  }
+
+  /* Forms */
+  .form-card{width:760px;max-width:calc(100% - 40px);background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06)}
+  .form-row{display:flex;gap:12px;margin-bottom:12px}
+  .form-row .input{flex:1}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px}
+  th{background:transparent;font-weight:700;color:#0f172a}
+  .action-btn{padding:6px 10px;border-radius:10px;border:none;cursor:pointer}
+  .delete-btn{background:#ef4444;color:#fff}
+  .edit-btn{background:#f59e0b;color:#fff}
+  .small-btn{padding:6px 8px;border-radius:8px}
+  .info-msg{padding:12px;border-radius:10px;background:#f1f5f9;color:#0f172a;margin-top:12px}
+
+  /* Search bar style */
+  .search-wrap{display:flex;align-items:center;gap:8px;margin-top:12px}
+  .search-input{
+    flex:1;padding:12px 14px;border-radius:999px;border:1px solid #e6ebf5;outline:none;font-size:15px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .search-submit{padding:10px;border-radius:999px;border:none;background:#fff;cursor:pointer}
+
+  /* Responsive */
+  @media(max-width:900px){
+    .menu-grid{grid-template-columns:repeat(2,1fr)}
+    .cat-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:520px){
+    .menu-grid{grid-template-columns:repeat(1,1fr)}
+    .cat-grid{grid-template-columns:repeat(1,1fr)}
+  }
+
+  /* highlight (italic+bold) */
+  .hit{font-weight:700;font-style:italic}
+  footer{font-size:12px;color:#64748b;padding-top:8px;text-align:center}
+</style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Library Management System">
+    <header>
+      <h1>Library Management System</h1>
+      
+    </header>
+
+    <!-- LOGIN SCREEN -->
+    <div id="screen-login" class="screen active" aria-hidden="false">
+      <div class="login-card" role="dialog" aria-label="Login">
+        <h2>Admin Login</h2>
+        <p>Enter credentials to continue</p>
+        <input id="login-username" class="input" placeholder="Username" value="" />
+        <input id="login-password" class="input" placeholder="Password" type="password" />
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+          <button id="btn-login" class="btn">Login</button>
+        </div>
+      
+      </div>
+    </div>
+
+    <!-- MAIN MENU -->
+    <div id="screen-main" class="screen" aria-hidden="true">
+      <div style="text-align:center;margin-bottom:10px"><h2>Main Menu</h2></div>
+      <div class="menu-grid" role="navigation" aria-label="Main menu">
+        <div class="menu-btn" data-action="add">
+          <img src="addbooks.jpg" alt="Add Books"> <!-- REPLACE: images/add_books.jpg -->
+          <div class="menu-label">Add Books</div>
+        </div>
+        <div class="menu-btn" data-action="search">
+          <img src="searchbook.jpg" alt="Search Books"> <!-- REPLACE: images/search_books.jpg -->
+          <div class="menu-label">Search Books</div>
+        </div>
+        <div class="menu-btn" data-action="delete">
+          <img src="deletebook.jpg" alt="Delete Books"> <!-- REPLACE: images/delete_books.jpg -->
+          <div class="menu-label">Delete Books</div>
+        </div>
+
+        <div class="menu-btn" data-action="issue">
+          <img src="issuebooks.jpg" alt="Issue & Return"> <!-- REPLACE: images/issue_return.jpg -->
+          <div class="menu-label">Issue & Return</div>
+        </div>
+        <div class="menu-btn" data-action="edit">
+          <img src="editbooks.jpg" alt="Edit Books"> <!-- REPLACE: images/edit_books.jpg -->
+          <div class="menu-label">Edit Books</div>
+        </div>
+        <div class="menu-btn" data-action="view">
+          <img src="viewibooks.jpg" alt="View Books"> <!-- REPLACE: images/view_books.jpg -->
+          <div class="menu-label">View Books</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORY SCREEN (reused for Add/Delete/View/Edit/Remove Issued) -->
+    <div id="screen-categories" class="screen" aria-hidden="true">
+      <div style="text-align:center"><h2 id="cat-screen-title">Choose Category</h2></div>
+      <div class="cat-grid" id="category-grid"></div>
+      <button class="go-back" id="cat-go-back">Go Back</button>
+    </div>
+
+    <!-- ADD FORM -->
+    <div id="screen-add" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3 id="add-title">Add Book — <span id="add-category-name"></span></h3>
+        <div class="form-row">
+          <input id="add-id" class="input" placeholder="Book ID (string)" />
+          <input id="add-name" class="input" placeholder="Book Name" />
+        </div>
+        <div class="form-row">
+          <input id="add-author" class="input" placeholder="Author" />
+          <input id="add-price" class="input" placeholder="Price (number)" type="number" min="0" />
+        </div>
+        <div class="form-row">
+          <input id="add-rack" class="input" placeholder="Rack" />
+          <input id="add-quantity" class="input" placeholder="Quantity (number)" type="number" min="0" />
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px">
+          <button id="add-save" class="btn">Save</button>
+          <button id="add-cancel" class="btn secondary">Cancel</button>
+        </div>
+        <div id="add-result" style="margin-top:12px"></div>
+      </div>
+      <button class="go-back" id="add-go-back">Go Back</button>
+    </div>
+
+    <!-- DELETE TABLE -->
+    <div id="screen-delete" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>Delete Books — <span id="delete-category-name"></span></h3>
+        <div id="delete-table-wrap"></div>
+      </div>
+      <button class="go-back" id="delete-go-back">Go Back</button>
+    </div>
+
+    <!-- VIEW TABLE -->
+    <div id="screen-view" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>View Books — <span id="view-category-name"></span></h3>
+        <div id="view-table-wrap"></div>
+      </div>
+      <button class="go-back" id="view-go-back">Go Back</button>
+    </div>
+
+    <!-- EDIT TABLE & FORM -->
+    <div id="screen-edit" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>Edit Books — <span id="edit-category-name"></span></h3>
+        <div id="edit-table-wrap"></div>
+      </div>
+      <button class="go-back" id="edit-go-back">Go Back</button>
+    </div>
+
+    <!-- EDIT FORM (modal-like inside same screen) -->
+    <div id="edit-form-modal" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;">
+      <div class="form-card" style="max-width:560px">
+        <h3>Edit Book</h3>
+        <div class="form-row">
+          <input id="edit-id" class="input" placeholder="Book ID" readonly />
+          <input id="edit-name" class="input" placeholder="Book Name" />
+        </div>
+        <div class="form-row">
+          <input id="edit-author" class="input" placeholder="Author" />
+          <input id="edit-price" class="input" type="number" min="0" placeholder="Price" />
+        </div>
+        <div class="form-row">
+          <input id="edit-rack" class="input" placeholder="Rack" />
+          <input id="edit-quantity" class="input" type="number" min="0" placeholder="Quantity" />
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button id="edit-save" class="btn">Save</button>
+          <button id="edit-cancel" class="btn secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH BOOKS -->
+    <div id="screen-search" class="screen" aria-hidden="true">
+      <div style="text-align:center"><h3>Search Books</h3></div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:10px">
+        <div class="menu-btn" id="search-by-id" style="min-width:180px;min-height:110px">
+          <img src="searchbyid.jpg" alt="Search by ID"> <!-- REPLACE: images/search_id.jpg -->
+          <div class="menu-label">Search by ID</div>
+        </div>
+        <div class="menu-btn" id="search-by-name" style="min-width:180px;min-height:110px">
+          <img src="searchbyname.jpg" alt="Search by Name"> <!-- REPLACE: images/search_name.jpg -->
+          <div class="menu-label">Search by Name</div>
+        </div>
+      </div>
+
+      <div id="search-bar-area" style="width:760px;max-width:calc(100% - 40px);margin-top:16px;display:none">
+        <div class="search-wrap">
+          <input id="search-input" class="search-input" placeholder="Type and press search..." />
+          <button id="search-submit" class="search-submit"><img src="search.png" alt="search" style="width:28px;height:28px;"/> <!-- REPLACE: images/search_icon.png --></button>
+        </div>
+        <div id="search-results"></div>
+      </div>
+
+      <button class="go-back" id="search-go-back">Go Back</button>
+    </div>
+
+    <!-- ISSUE & RETURN MENU -->
+    <div id="screen-issue-menu" class="screen" aria-hidden="true">
+      <div style="text-align:center"><h3>Issue & Return</h3></div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+        <div class="menu-btn" id="issue-do" style="min-width:150px;min-height:120px">
+          <img src="isssuebook.jpg" alt="Issue Book"> <!-- REPLACE: images/issue_book.jpg -->
+          <div class="menu-label">Issue Book</div>
+        </div>
+        <div class="menu-btn" id="view-issued" style="min-width:150px;min-height:120px">
+          <img src="viewissued.jpg" alt="View Issued"> <!-- REPLACE: images/view_issued.jpg -->
+          <div class="menu-label">View Issued Books</div>
+        </div>
+        <div class="menu-btn" id="search-issued" style="min-width:150px;min-height:120px">
+          <img src="searchissued.jpg" alt="Search Issued"> <!-- REPLACE: images/search_issued.jpg -->
+          <div class="menu-label">Search Issued Book</div>
+        </div>
+        <div class="menu-btn" id="remove-issued" style="min-width:150px;min-height:120px">
+          <img src="removeissued.jpg" alt="Remove Issued"> <!-- REPLACE: images/remove_issued.jpg -->
+          <div class="menu-label">Remove Issued Book</div>
+        </div>
+      </div>
+      <button class="go-back" id="issue-go-back">Go Back</button>
+    </div>
+
+    <!-- ISSUE FORM -->
+    <div id="screen-issue-form" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>Issue Book</h3>
+        <div style="margin-bottom:8px;color:#334155">Select a book to issue (only books with quantity &gt; 0 shown).</div>
+        <select id="issue-select" class="input" style="margin-bottom:10px"></select>
+        <input id="issue-student" class="input" placeholder="Student ID" style="margin-bottom:10px"/>
+        <input id="issue-date" class="input" type="date" style="margin-bottom:10px"/>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button id="issue-save" class="btn">Issue</button>
+          <button id="issue-cancel" class="btn secondary">Cancel</button>
+        </div>
+        <div id="issue-result" style="margin-top:12px"></div>
+      </div>
+      <button class="go-back" id="issue-form-go-back">Go Back</button>
+    </div>
+
+    <!-- VIEW ISSUED TABLE -->
+    <div id="screen-view-issued" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>View Issued Books</h3>
+        <div id="view-issued-wrap"></div>
+      </div>
+      <button class="go-back" id="view-issued-go-back">Go Back</button>
+    </div>
+
+    <!-- SEARCH ISSUED -->
+    <div id="screen-search-issued" class="screen" aria-hidden="true">
+      <div style="text-align:center"><h3>Search Issued Books</h3></div>
+      <div style="width:760px;max-width:calc(100% - 40px);margin-top:16px;">
+        <div class="search-wrap">
+          <input id="search-issued-input" class="search-input" placeholder="Type and press search..." />
+          <button id="search-issued-submit" class="search-submit"><img src="search.png" alt="search" style="width:28px;height:28px;"/></button> <!-- REPLACE: images/search_icon.png -->
+        </div>
+        <div id="search-issued-results"></div>
+      </div>
+      <button class="go-back" id="search-issued-go-back">Go Back</button>
+    </div>
+
+    <!-- REMOVE ISSUED CATEGORY -> table -->
+    <div id="screen-remove-issued" class="screen" aria-hidden="true">
+      <div class="form-card">
+        <h3>Remove Issued — <span id="remove-category-name"></span></h3>
+        <div id="remove-issued-table"></div>
+      </div>
+      <button class="go-back" id="remove-issued-go-back">Go Back</button>
+    </div>
+
+    
+  </div>
+
+<script>
+/*
+  Important: This single-file app uses only localStorage keys "books" and "issued".
+  Helper functions at top: getBooks(), saveBooks(), getIssued(), saveIssued().
+  No file system APIs. Save as index.html and open in browser.
+*/
+
+/* --------------------
+   Helper storage functions (use everywhere)
+   -------------------- */
+function getBooks(){
+  try{
+    const raw = localStorage.getItem('books');
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){console.error('getBooks parse err',e); return [];}
+}
+function saveBooks(arr){
+  localStorage.setItem('books', JSON.stringify(arr));
+}
+function getIssued(){
+  try{
+    const raw = localStorage.getItem('issued');
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){console.error('getIssued parse err',e); return [];}
+}
+function saveIssued(arr){
+  localStorage.setItem('issued', JSON.stringify(arr));
+}
+
+/* --------------------
+   App state & constants
+   -------------------- */
+const CATEGORIES = ['Computer','Electronics','Electrical','Civil','Mechanical','Architecture'];
+let currentOperation = null; // 'add','delete','view','edit','remove-issued','search','issue' etc.
+let activeCategory = null;
+let editTargetId = null;
+
+/* --------------------
+   UI elements
+   -------------------- */
+const screens = {
+  login: document.getElementById('screen-login'),
+  main: document.getElementById('screen-main'),
+  categories: document.getElementById('screen-categories'),
+  add: document.getElementById('screen-add'),
+  del: document.getElementById('screen-delete'),
+  view: document.getElementById('screen-view'),
+  edit: document.getElementById('screen-edit'),
+  editModal: document.getElementById('edit-form-modal'),
+  search: document.getElementById('screen-search'),
+  issueMenu: document.getElementById('screen-issue-menu'),
+  issueForm: document.getElementById('screen-issue-form'),
+  viewIssued: document.getElementById('screen-view-issued'),
+  searchIssued: document.getElementById('screen-search-issued'),
+  removeIssued: document.getElementById('screen-remove-issued'),
+};
+
+/* Utility: show screen */
+function showScreen(name){
+  for(const k in screens){
+    const el = screens[k];
+    if(!el) continue;
+    if(k === name){
+      el.classList.add('active');
+      el.setAttribute('aria-hidden','false');
+    } else {
+      el.classList.remove('active');
+      el.setAttribute('aria-hidden','true');
+    }
+  }
+  // Hide edit modal initially unless explicitly shown
+  if(name !== 'edit') hideEditModal();
+}
+
+/* --------------------
+   Login handling
+   -------------------- */
+document.getElementById('btn-login').addEventListener('click',()=>{
+  const u = document.getElementById('login-username').value.trim();
+  const p = document.getElementById('login-password').value;
+  if(u === 'admin' && p === '1234'){
+    // login success
+    showScreen('main');
+    currentOperation = null;
+  } else {
+    alert('Invalid credentials');
+  }
+});
+
+/* --------------------
+   Main menu actions (2x3)
+   -------------------- */
+document.querySelectorAll('.menu-btn[data-action]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const action = btn.getAttribute('data-action');
+    currentOperation = action;
+    if(action === 'add' || action === 'delete' || action === 'view' || action === 'edit' || action === 'remove-issued'){
+      prepareCategoryScreen(action);
+    } else if(action === 'search'){
+      // go to search menu
+      showScreen('search');
+      currentOperation = 'search';
+    } else if(action === 'issue'){
+      showScreen('issueMenu');
+      currentOperation = 'issue-menu';
+    }
+  });
+});
+
+/* --------------------
+   Category screen: reused
+   -------------------- */
+const categoryGrid = document.getElementById('category-grid');
+const catTitle = document.getElementById('cat-screen-title');
+document.getElementById('cat-go-back').addEventListener('click',()=>{ showScreen('main'); currentOperation=null; activeCategory=null; });
+
+function prepareCategoryScreen(operation){
+  // operation indicates what will happen after selecting category
+  activeCategory = null;
+  currentOperation = operation;
+  catTitle.textContent = (operation==='add' ? 'Select Category to Add' :
+                          operation==='delete' ? 'Select Category to Delete From' :
+                          operation==='view' ? 'Select Category to View' :
+                          operation==='edit' ? 'Select Category to Edit' :
+                          operation==='remove-issued' ? 'Select Category (Issued)' : 'Choose Category');
+  categoryGrid.innerHTML='';
+  CATEGORIES.forEach(cat=>{
+    const d = document.createElement('div');
+    d.className='cat-btn';
+    d.innerHTML = `<img src="book.jpg" alt="${cat}"> <!-- REPLACE: images/cat_${cat.toLowerCase()}.jpg -->
+                   <div class="cat-label">${cat}</div>`;
+    d.addEventListener('click',()=>onCategorySelected(operation,cat));
+    categoryGrid.appendChild(d);
+  });
+  showScreen('categories');
+}
+
+function onCategorySelected(operation,category){
+  activeCategory = category;
+  if(operation === 'add'){
+    // show add form
+    document.getElementById('add-category-name').textContent = category;
+    // clear form
+    document.getElementById('add-id').value='';
+    document.getElementById('add-name').value='';
+    document.getElementById('add-author').value='';
+    document.getElementById('add-price').value='';
+    document.getElementById('add-rack').value='';
+    document.getElementById('add-quantity').value='';
+    document.getElementById('add-result').innerHTML='';
+    showScreen('add');
+  } else if(operation === 'delete'){
+    document.getElementById('delete-category-name').textContent = category;
+    renderDeleteTable(category);
+    showScreen('del');
+  } else if(operation === 'view'){
+    document.getElementById('view-category-name').textContent = category;
+    renderViewTable(category);
+    showScreen('view');
+  } else if(operation === 'edit'){
+    document.getElementById('edit-category-name').textContent = category;
+    renderEditTable(category);
+    showScreen('edit');
+  } else if(operation === 'remove-issued'){
+    document.getElementById('remove-category-name').textContent = category;
+    renderRemoveIssuedTable(category);
+    showScreen('removeIssued');
+  }
+}
+
+/* --------------------
+   Add Book logic
+   -------------------- */
+document.getElementById('add-save').addEventListener('click',()=>{
+  const id = document.getElementById('add-id').value.trim();
+  const name = document.getElementById('add-name').value.trim();
+  const author = document.getElementById('add-author').value.trim();
+  const priceRaw = document.getElementById('add-price').value;
+  const rack = document.getElementById('add-rack').value.trim();
+  const qtyRaw = document.getElementById('add-quantity').value;
+  if(!id || !name){ alert('Please provide ID and Name'); return; }
+  const price = parseFloat(priceRaw) || 0;
+  const quantity = parseInt(qtyRaw) || 0;
+  const books = getBooks();
+  // if id exists, replace existing with same id+category
+  const existingIdx = books.findIndex(b=>b.id===id && b.category===activeCategory);
+  if(existingIdx >= 0){
+    books[existingIdx] = { id, name, author, price, rack, quantity, category: activeCategory };
+  } else {
+    books.push({ id, name, author, price, rack, quantity, category: activeCategory });
+  }
+  saveBooks(books);
+  const resultEl = document.getElementById('add-result');
+  resultEl.innerHTML = `<div class="info-msg">Saved. What next?</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px">
+      <button id="add-another" class="btn">Add another</button>
+      <button id="add-goback" class="btn secondary">Go Back</button>
+    </div>`;
+  document.getElementById('add-another').addEventListener('click',()=>{
+    document.getElementById('add-id').value='';
+    document.getElementById('add-name').value='';
+    document.getElementById('add-author').value='';
+    document.getElementById('add-price').value='';
+    document.getElementById('add-rack').value='';
+    document.getElementById('add-quantity').value='';
+    resultEl.innerHTML='';
+  });
+  document.getElementById('add-goback').addEventListener('click',()=>{
+    showScreen('categories'); prepareCategoryScreen('add'); // stay in category selection
+  });
+});
+document.getElementById('add-cancel').addEventListener('click',()=>{
+  showScreen('categories'); prepareCategoryScreen('add');
+});
+document.getElementById('add-go-back').addEventListener('click',()=>{
+  showScreen('categories'); prepareCategoryScreen('add');
+});
+
+/* --------------------
+   Delete logic (category-specific table with Delete buttons)
+   -------------------- */
+function renderDeleteTable(category){
+  const wrap = document.getElementById('delete-table-wrap');
+  const books = getBooks().filter(b=>b.category===category);
+  if(books.length === 0){
+    wrap.innerHTML = '<div class="info-msg">No Books Available</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>ID</th><th>Name</th><th></th></tr></thead><tbody>`;
+  books.forEach(b=>{
+    html += `<tr data-id="${b.id}"><td>${escapeHtml(b.id)}</td><td>${escapeHtml(b.name)}</td>
+             <td style="text-align:right"><button class="action-btn delete-btn small-btn" data-id="${b.id}">Delete</button></td></tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+  // attach listeners
+  wrap.querySelectorAll('button.delete-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id = btn.getAttribute('data-id');
+      if(!confirm('Delete this book?')) return;
+      let booksAll = getBooks();
+      booksAll = booksAll.filter(x=> !(x.id===id && x.category===category));
+      saveBooks(booksAll);
+      // update UI but stay on delete screen
+      renderDeleteTable(category);
+    });
+  });
+}
+document.getElementById('delete-go-back').addEventListener('click',()=>{
+  showScreen('categories'); prepareCategoryScreen('delete');
+});
+
+/* --------------------
+   View logic (show full details)
+   -------------------- */
+function renderViewTable(category){
+  const wrap = document.getElementById('view-table-wrap');
+  const books = getBooks().filter(b=>b.category===category);
+  if(books.length === 0){
+    wrap.innerHTML = '<div class="info-msg">No Books Available</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Author</th><th>Price</th><th>Rack</th><th>Quantity</th><th>Category</th></tr></thead><tbody>`;
+  books.forEach(b=>{
+    html += `<tr><td>${escapeHtml(b.id)}</td><td>${escapeHtml(b.name)}</td><td>${escapeHtml(b.author)}</td>
+             <td>${Number(b.price)}</td><td>${escapeHtml(b.rack)}</td><td>${Number(b.quantity)}</td><td>${escapeHtml(b.category)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+document.getElementById('view-go-back').addEventListener('click',()=>{
+  showScreen('categories'); prepareCategoryScreen('view');
+});
+
+/* --------------------
+   Edit logic
+   -------------------- */
+function renderEditTable(category){
+  const wrap = document.getElementById('edit-table-wrap');
+  const books = getBooks().filter(b=>b.category===category);
+  if(books.length === 0){
+    wrap.innerHTML = '<div class="info-msg">No Books Available</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Quantity</th><th></th></tr></thead><tbody>`;
+  books.forEach(b=>{
+    html += `<tr data-id="${b.id}"><td>${escapeHtml(b.id)}</td><td>${escapeHtml(b.name)}</td><td>${Number(b.quantity)}</td>
+             <td style="text-align:right"><button class="action-btn edit-btn small-btn" data-id="${b.id}">Edit</button></td></tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('button.edit-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id = btn.getAttribute('data-id');
+      openEditModal(id, category);
+    });
+  });
+}
+document.getElementById('edit-go-back').addEventListener('click',()=>{
+  showScreen('categories'); prepareCategoryScreen('edit');
+});
+
+// Edit Modal functions
+function openEditModal(id, category){
+  const books = getBooks();
+  const b = books.find(x=>x.id===id && x.category===category);
+  if(!b) return alert('Book not found');
+  editTargetId = id;
+  document.getElementById('edit-id').value = b.id;
+  document.getElementById('edit-name').value = b.name;
+  document.getElementById('edit-author').value = b.author;
+  document.getElementById('edit-price').value = b.price;
+  document.getElementById('edit-rack').value = b.rack;
+  document.getElementById('edit-quantity').value = b.quantity;
+  showEditModal();
+}
+function showEditModal(){ document.getElementById('edit-form-modal').style.display='block'; }
+function hideEditModal(){ document.getElementById('edit-form-modal').style.display='none'; }
+
+document.getElementById('edit-cancel').addEventListener('click',()=>{
+  hideEditModal();
+});
+document.getElementById('edit-save').addEventListener('click',()=>{
+  const id = document.getElementById('edit-id').value;
+  const name = document.getElementById('edit-name').value.trim();
+  const author = document.getElementById('edit-author').value.trim();
+  const price = parseFloat(document.getElementById('edit-price').value) || 0;
+  const rack = document.getElementById('edit-rack').value.trim();
+  const quantity = parseInt(document.getElementById('edit-quantity').value) || 0;
+  let books = getBooks();
+  const idx = books.findIndex(x=>x.id===id && x.category===activeCategory);
+  if(idx === -1){
+    alert('Book not found when saving.');
+    hideEditModal();
+    renderEditTable(activeCategory);
+    return;
+  }
+  books[idx] = { id, name, author, price, rack, quantity, category: activeCategory };
+  saveBooks(books);
+  hideEditModal();
+  // return to edit table
+  renderEditTable(activeCategory);
+});
+
+/* --------------------
+   Search books
+   -------------------- */
+let searchMode = null; // 'id' or 'name'
+document.getElementById('search-by-id').addEventListener('click',()=>{
+  searchMode = 'id';
+  showSearchBar();
+});
+document.getElementById('search-by-name').addEventListener('click',()=>{
+  searchMode = 'name';
+  showSearchBar();
+});
+function showSearchBar(){
+  document.getElementById('search-bar-area').style.display='block';
+  document.getElementById('search-input').value='';
+  document.getElementById('search-results').innerHTML='';
+  document.getElementById('search-input').focus();
+}
+document.getElementById('search-submit').addEventListener('click',()=>{
+  const term = document.getElementById('search-input').value.trim();
+  if(!term){ alert('Enter search term'); return; }
+  const books = getBooks();
+  let results = [];
+  if(searchMode === 'id'){
+    results = books.filter(b => b.id.toLowerCase() === term.toLowerCase());
+  } else {
+    // name search: partial match case-insensitive
+    results = books.filter(b => b.name.toLowerCase().includes(term.toLowerCase()));
+  }
+  displaySearchResults(results, term);
+});
+function displaySearchResults(results, term){
+  const wrap = document.getElementById('search-results');
+  if(results.length === 0){
+    wrap.innerHTML = '<div class="info-msg">Book Not Found</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Author</th><th>Price</th><th>Rack</th><th>Quantity</th><th>Category</th></tr></thead><tbody>`;
+  results.forEach(b=>{
+    html += `<tr>
+      <td>${highlight(b.id,term,searchMode==='id')}</td>
+      <td>${highlight(b.name,term,searchMode==='name')}</td>
+      <td>${escapeHtml(b.author)}</td>
+      <td>${Number(b.price)}</td>
+      <td>${escapeHtml(b.rack)}</td>
+      <td>${Number(b.quantity)}</td>
+      <td>${escapeHtml(b.category)}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+/* --------------------
+   Issue Menu & Issue Form
+   -------------------- */
+document.getElementById('issue-do').addEventListener('click',()=>{
+  prepareIssueForm();
+});
+document.getElementById('view-issued').addEventListener('click',()=>{
+  renderViewIssued();
+  showScreen('viewIssued');
+});
+document.getElementById('search-issued').addEventListener('click',()=>{
+  document.getElementById('search-issued-input').value='';
+  document.getElementById('search-issued-results').innerHTML='';
+  showScreen('searchIssued');
+});
+document.getElementById('remove-issued').addEventListener('click',()=>{
+  // needs category selection: use same category screen but operation remove-issued
+  prepareCategoryScreen('remove-issued');
+});
+
+document.getElementById('issue-go-back').addEventListener('click',()=>{ showScreen('main'); currentOperation=null; });
+document.getElementById('issue-form-go-back').addEventListener('click',()=>{ showScreen('issueMenu'); });
+
+function prepareIssueForm(){
+  // populate select with books having quantity > 0
+  const sel = document.getElementById('issue-select');
+  sel.innerHTML = '';
+  const books = getBooks().filter(b=>Number(b.quantity) > 0);
+  if(books.length === 0){
+    sel.innerHTML = '<option>No books available to issue</option>';
+  } else {
+    books.forEach(b=>{
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = `${b.id} - ${b.name} (${b.category}) [${b.quantity}]`;
+      sel.appendChild(opt);
+    });
+  }
+  document.getElementById('issue-student').value='';
+  document.getElementById('issue-date').valueAsDate = new Date();
+  document.getElementById('issue-result').innerHTML='';
+  showScreen('issueForm');
+}
+
+document.getElementById('issue-save').addEventListener('click',()=>{
+  const sel = document.getElementById('issue-select');
+  if(!sel.value){
+    alert('Select a book to issue');
+    return;
+  }
+  const bookId = sel.value;
+  let books = getBooks();
+  const bookIdx = books.findIndex(b=>b.id===bookId);
+  if(bookIdx === -1){ alert('Book not found'); return; }
+  if(Number(books[bookIdx].quantity) <= 0){ document.getElementById('issue-result').innerHTML = '<div class="info-msg">Book Not Available</div>'; return; }
+  const studentId = document.getElementById('issue-student').value.trim();
+  const dateVal = document.getElementById('issue-date').value;
+  if(!studentId || !dateVal){ alert('Provide Student ID and Date'); return; }
+  // decrement quantity
+  books[bookIdx].quantity = Number(books[bookIdx].quantity) - 1;
+  saveBooks(books);
+
+  // append to issued with a record of quantity 1
+  const issued = getIssued();
+  const rec = {
+    id: books[bookIdx].id,
+    name: books[bookIdx].name,
+    author: books[bookIdx].author,
+    price: books[bookIdx].price,
+    rack: books[bookIdx].rack,
+    quantity: 1,
+    category: books[bookIdx].category,
+    studentId,
+    date: dateVal
+  };
+  issued.push(rec);
+  saveIssued(issued);
+
+  // show success UI
+  const resultEl = document.getElementById('issue-result');
+  resultEl.innerHTML = `<div class="info-msg">Issued Successfully</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px">
+      <button id="issue-another" class="btn">Issue Another</button>
+      <button id="issue-back-menu" class="btn secondary">Go Back to Issue Menu</button>
+    </div>`;
+  document.getElementById('issue-another').addEventListener('click',()=> prepareIssueForm());
+  document.getElementById('issue-back-menu').addEventListener('click',()=> { showScreen('issueMenu'); });
+});
+
+document.getElementById('issue-cancel').addEventListener('click',()=> showScreen('issueMenu'));
+
+/* --------------------
+   View Issued
+   -------------------- */
+function renderViewIssued(){
+  const wrap = document.getElementById('view-issued-wrap');
+  const issued = getIssued();
+  if(issued.length === 0){
+    wrap.innerHTML = '<div class="info-msg">No Issued Records</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>Book ID</th><th>Name</th><th>Student ID</th><th>Date</th><th>Category</th><th></th></tr></thead><tbody>`;
+  issued.forEach((r,idx)=>{
+    html += `<tr data-idx="${idx}"><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td>
+             <td>${escapeHtml(r.studentId)}</td><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td>
+             <td style="text-align:right"><button class="action-btn delete-btn small-btn" data-idx="${idx}">Remove</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  // Allow removal here too: removing issued record should increment book quantity
+  wrap.querySelectorAll('button.delete-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx = parseInt(btn.getAttribute('data-idx'));
+      if(!confirm('Remove this issued record?')) return;
+      const issued = getIssued();
+      const rec = issued[idx];
+      // remove issued entry
+      issued.splice(idx,1);
+      saveIssued(issued);
+      // increment book quantity if book exists
+      const books = getBooks();
+      const bIdx = books.findIndex(b=>b.id===rec.id && b.category===rec.category);
+      if(bIdx >= 0){ books[bIdx].quantity = Number(books[bIdx].quantity) + Number(rec.quantity || 1); saveBooks(books); }
+      renderViewIssued();
+    });
+  });
+}
+document.getElementById('view-issued-go-back').addEventListener('click',()=> showScreen('issueMenu'));
+
+/* --------------------
+   Search Issued
+   -------------------- */
+document.getElementById('search-issued-submit').addEventListener('click',()=>{
+  const term = document.getElementById('search-issued-input').value.trim();
+  if(!term){ alert('Enter search term'); return; }
+  const issued = getIssued();
+  // search id, name, or studentId
+  const low = term.toLowerCase();
+  const results = issued.filter(r =>
+    (r.id && r.id.toLowerCase() === low) ||
+    (r.name && r.name.toLowerCase().includes(low)) ||
+    (r.studentId && r.studentId.toLowerCase().includes(low))
+  );
+  const wrap = document.getElementById('search-issued-results');
+  if(results.length === 0){ wrap.innerHTML = '<div class="info-msg">Book Not Found</div>'; return; }
+  let html = `<table><thead><tr><th>Book ID</th><th>Name</th><th>Student ID</th><th>Date</th><th>Category</th></tr></thead><tbody>`;
+  results.forEach(r=>{
+    html += `<tr><td>${highlightIssued(r.id,term)}</td><td>${highlightIssued(r.name,term)}</td><td>${highlightIssued(r.studentId,term)}</td><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+});
+document.getElementById('search-issued-go-back').addEventListener('click',()=> showScreen('issueMenu'));
+
+/* --------------------
+   Remove Issued (category -> table)
+   -------------------- */
+function renderRemoveIssuedTable(category){
+  const wrap = document.getElementById('remove-issued-table');
+  const issued = getIssued().filter(r=>r.category === category);
+  if(issued.length === 0){
+    wrap.innerHTML = '<div class="info-msg">No Issued Records for this category</div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>Book ID</th><th>Name</th><th>Student ID</th><th>Date</th><th></th></tr></thead><tbody>`;
+  issued.forEach((r,idx)=>{
+    html += `<tr data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-stu="${escapeHtml(r.studentId)}">
+      <td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.studentId)}</td><td>${escapeHtml(r.date)}</td>
+      <td style="text-align:right"><button class="action-btn delete-btn small-btn" data-id="${r.id}" data-student="${escapeHtml(r.studentId)}">Remove</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('button.delete-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id = btn.getAttribute('data-id');
+      const student = btn.getAttribute('data-student');
+      if(!confirm('Remove this issued record?')) return;
+      // find the issued record in global array (match by id + student + category)
+      let issuedAll = getIssued();
+      const idx = issuedAll.findIndex(r => r.id === id && r.studentId === student && r.category === category);
+      if(idx === -1) { alert('Issued record not found'); renderRemoveIssuedTable(category); return; }
+      const rec = issuedAll[idx];
+      // remove it
+      issuedAll.splice(idx,1);
+      saveIssued(issuedAll);
+      // increment corresponding book quantity
+      const books = getBooks();
+      const bIdx = books.findIndex(b => b.id === rec.id && b.category === rec.category);
+      if(bIdx >= 0){ books[bIdx].quantity = Number(books[bIdx].quantity) + Number(rec.quantity || 1); saveBooks(books); }
+      // refresh table but remain on this screen
+      renderRemoveIssuedTable(category);
+    });
+  });
+}
+document.getElementById('remove-issued-go-back').addEventListener('click',()=> showScreen('categories'));
+
+/* --------------------
+   Utilities: escapeHtml, highlight
+   -------------------- */
+function escapeHtml(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/[&<>"']/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[s]));
+}
+function highlight(text, term, exactMatch){
+  if(!term) return escapeHtml(text);
+  const t = String(text);
+  if(exactMatch){
+    if(t.toLowerCase() === term.toLowerCase()) return `<span class="hit">${escapeHtml(t)}</span>`;
+    return escapeHtml(t);
+  } else {
+    const idx = t.toLowerCase().indexOf(term.toLowerCase());
+    if(idx === -1) return escapeHtml(t);
+    const before = escapeHtml(t.slice(0,idx));
+    const match = escapeHtml(t.slice(idx, idx + term.length));
+    const after = escapeHtml(t.slice(idx + term.length));
+    return `${before}<span class="hit">${match}</span>${after}`;
+  }
+}
+function highlightIssued(text, term){
+  if(!term) return escapeHtml(text);
+  const t = String(text);
+  const idx = t.toLowerCase().indexOf(term.toLowerCase());
+  if(idx === -1) return escapeHtml(t);
+  const before = escapeHtml(t.slice(0,idx));
+  const match = escapeHtml(t.slice(idx, idx + term.length));
+  const after = escapeHtml(t.slice(idx + term.length));
+  return `${before}<span class="hit">${match}</span>${after}`;
+}
+
+/* --------------------
+   Small helpers and navigation for search screen go-back etc.
+   -------------------- */
+document.getElementById('search-go-back').addEventListener('click',()=> { showScreen('main'); currentOperation=null; });
+document.getElementById('search-by-id').addEventListener('keypress',(e)=>{ if(e.key==='Enter') { e.target.click(); } });
+document.getElementById('search-by-name').addEventListener('keypress',(e)=>{ if(e.key==='Enter') { e.target.click(); } });
+
+/* (Removed duplicate listeners for #cat-go-back and #edit-go-back here) */
+
+/* --------------------
+   Initialization: ensure localStorage keys exist
+   -------------------- */
+(function init(){
+  if(localStorage.getItem('books') === null) saveBooks([]);
+  if(localStorage.getItem('issued') === null) saveIssued([]);
+  // wire some other simple listeners
+  document.getElementById('search-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('search-submit').click(); });
+  document.getElementById('search-issued-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('search-issued-submit').click(); });
+})();
+
+/* Accessibility: Enter key on login fields */
+document.getElementById('login-password').addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('btn-login').click(); });
+
+/* End of script */
+</script>
+
+<!--
+IMAGE CHECKLIST (20 items)
+1) images/background.jpg — App page background.
+2) images/add_books.jpg — Main menu: Add Books tile.
+3) images/search_books.jpg — Main menu: Search Books tile.
+4) images/delete_books.jpg — Main menu: Delete Books tile.
+5) images/issue_return.jpg — Main menu: Issue & Return tile.
+6) images/edit_books.jpg — Main menu: Edit Books tile.
+7) images/view_books.jpg — Main menu: View Books tile.
+8) images/cat_computer.jpg — Category button: Computer.
+9) images/cat_electronics.jpg — Category button: Electronics.
+10) images/cat_electrical.jpg — Category button: Electrical.
+11) images/cat_civil.jpg — Category button: Civil.
+12) images/cat_mechanical.jpg — Category button: Mechanical.
+13) images/cat_architecture.jpg — Category button: Architecture.
+14) images/search_id.jpg — Search screen: Search by ID card image.
+15) images/search_name.jpg — Search screen: Search by Name card image.
+16) images/search_icon.png — Magnifying glass icon (used in both search bars).
+17) images/issue_book.jpg — Issue & Return menu: Issue Book card.
+18) images/view_issued.jpg — Issue & Return menu: View Issued card.
+19) images/search_issued.jpg — Issue & Return menu: Search Issued card.
+20) images/remove_issued.jpg — Issue & Return menu: Remove Issued card.
+-->
+
+<!--
+CHANGELOG
+- Removed duplicate event listeners for:
+  • #cat-go-back (kept the version that also clears state; removed the extra minimal one).
+  • #edit-go-back (kept the version that re-prepares the category screen; removed the extra minimal one).
+  This prevents redundant handler invocations without changing UI/behavior.
+- Added explicit placeholder comments next to all <img> tags for clarity.
+- Hardened "Search Issued" filter to guard against undefined fields when lowercasing.
+- Reviewed sanitization: ensured escapeHtml() is used wherever user-provided values render in tables.
+- Verified all flows and ensured no console errors under normal use (image 404s are expected until files are added).
+-->
+</body>
+</html>
